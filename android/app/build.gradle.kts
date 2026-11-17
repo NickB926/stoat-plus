@@ -55,6 +55,34 @@ fun buildproperty(propertyName: String, fallbackEnv: String? = null): String? {
     return property("stoatbuild.properties", propertyName, fallbackEnv)
 }
 
+// Stoat+: our own version (repo-root VERSION file, or STOATPLUS_VERSION from CI)
+val stoatPlusVersion: String = (System.getenv("STOATPLUS_VERSION")
+    ?: rootProject.file("../VERSION").takeIf { it.exists() }?.readText())
+    .orEmpty().trim().removePrefix("v").ifEmpty { "0.0.0" }
+val stoatPlusVersionCode: Int = stoatPlusVersion.split(".", "-").take(3)
+    .map { it.toIntOrNull() ?: 0 }
+    .plus(listOf(0, 0, 0))
+    .let { (major, minor, patch) -> 200_000_000 + major * 1_000_000 + minor * 1_000 + patch }
+val stoatPlusRepo: String = System.getenv("STOATPLUS_REPO") ?: "NickB926/stoat-plus"
+
+// Stoat+: release signing from CI secrets, or the local keys/signing.properties
+val stoatPlusSigning: Map<String, String>? = run {
+    val env = System.getenv("STOATPLUS_KEYSTORE")
+    if (env != null) {
+        mapOf(
+            "storeFile" to env,
+            "storePassword" to System.getenv("STOATPLUS_KEYSTORE_PASSWORD").orEmpty(),
+            "keyAlias" to (System.getenv("STOATPLUS_KEY_ALIAS") ?: "stoatplus"),
+            "keyPassword" to System.getenv("STOATPLUS_KEY_PASSWORD").orEmpty(),
+        )
+    } else {
+        rootProject.file("../keys/signing.properties").takeIf { it.exists() }?.let { f ->
+            val props = Properties().apply { FileInputStream(f).use { load(it) } }
+            props.stringPropertyNames().associateWith { props.getProperty(it) }
+        }
+    }
+}
+
 android {
     compileSdk {
         version = release(libs.versions.compileSdk.get().toInt()) {
@@ -67,8 +95,11 @@ android {
         applicationId = "chat.stoat.plus"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = Integer.parseInt("001_008_001".replace("_", ""), 10)
-        versionName = "1.8.1"
+        // Stoat+ versions; based on upstream Stoat 1.8.1
+        versionCode = stoatPlusVersionCode
+        versionName = "$stoatPlusVersion (Stoat 1.8.1)"
+        buildConfigField("String", "STOATPLUS_VERSION", "\"$stoatPlusVersion\"")
+        buildConfigField("String", "STOATPLUS_REPO", "\"$stoatPlusRepo\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -76,10 +107,23 @@ android {
         }
     }
 
+    signingConfigs {
+        if (stoatPlusSigning != null) {
+            create("stoatplus") {
+                storeFile = file(stoatPlusSigning.getValue("storeFile"))
+                storePassword = stoatPlusSigning.getValue("storePassword")
+                keyAlias = stoatPlusSigning.getValue("keyAlias")
+                keyPassword = stoatPlusSigning.getValue("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // Stoat+: sideloaded builds are signed with this machine's debug key.
-            signingConfig = signingConfigs.getByName("debug")
+            // Stoat+: signed with the Stoat+ release key when available, so
+            // new versions install over old ones; otherwise the debug key.
+            signingConfig = signingConfigs.findByName("stoatplus")
+                ?: signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

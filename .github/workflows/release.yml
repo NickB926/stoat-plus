@@ -1,0 +1,115 @@
+name: Release
+
+# Push a tag like v1.0.1 to build and publish a release.
+# Obtainium and the in-app updater pick up the APK from the latest release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the version
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then V="${GITHUB_REF_NAME#v}"; else V="$(tr -d '[:space:]' < VERSION)"; fi
+          echo "STOATPLUS_VERSION=$V" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build settings
+        working-directory: android
+        run: |
+          printf 'sentry.dsn=\nsentry.upload_mappings=false\nbuild.debug.app_name=Stoat+ (debug)\nbuild.flavour_id=ZZUU\n' > stoatbuild.properties
+
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.STOATPLUS_KEYSTORE_BASE64 }}
+        run: |
+          if [[ -z "$KEYSTORE_BASE64" ]]; then echo "::error::STOATPLUS_KEYSTORE_BASE64 secret is missing"; exit 1; fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "STOATPLUS_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        working-directory: android
+        env:
+          STOATPLUS_KEYSTORE_PASSWORD: ${{ secrets.STOATPLUS_KEYSTORE_PASSWORD }}
+          STOATPLUS_KEY_PASSWORD: ${{ secrets.STOATPLUS_KEY_PASSWORD }}
+          STOATPLUS_KEY_ALIAS: stoatplus
+          STOATPLUS_REPO: ${{ github.repository }}
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --console=plain
+          mkdir -p ../dist
+          cp app/build/outputs/apk/release/app-release.apk "../dist/StoatPlus-$STOATPLUS_VERSION.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/*.apk
+
+  desktop:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then V="${GITHUB_REF_NAME#v}"; else V="$(tr -d '[:space:]' < VERSION)"; fi
+          echo "STOATPLUS_VERSION=$V" >> "$GITHUB_ENV"
+
+      - name: Stoat brand assets
+        run: git clone --depth 1 https://github.com/stoatchat/assets desktop/assets
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build zip
+        working-directory: desktop
+        shell: bash
+        run: |
+          npx -y pnpm@11.17.0 install --frozen-lockfile
+          npx -y pnpm@11.17.0 exec electron-forge make --targets @electron-forge/maker-zip
+          mkdir -p ../dist
+          cp out/make/zip/win32/x64/*.zip "../dist/StoatPlus-desktop-windows-$STOATPLUS_VERSION.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop
+          path: dist/*.zip
+
+  release:
+    needs: [android, desktop]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            Unofficial modified Stoat client with plugin support. Not affiliated with Stoat.
+
+            **Android:** download `StoatPlus-*.apk` and open it, or add this repo to [Obtainium](https://github.com/ImranR98/Obtainium) for automatic updates.
+            **Windows:** download the desktop zip, unzip it anywhere, and run `stoat-plus.exe`.

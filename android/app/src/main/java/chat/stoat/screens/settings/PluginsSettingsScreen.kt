@@ -60,6 +60,7 @@ import chat.stoat.core.designsystem.icons.painter
 import chat.stoat.plugins.PluginEngine
 import chat.stoat.plugins.PluginInfo
 import chat.stoat.plugins.PluginSetting
+import chat.stoat.plugins.StoatPlusUpdates
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -142,6 +143,22 @@ fun PluginsSettingsScreen(navController: NavController) {
                 .fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            item {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                ) {
+                    Text(
+                        "Stoat+ ${StoatPlusUpdates.currentVersion}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = {
+                        scope.launch { StoatPlusUpdates.check(context, manual = true) }
+                    }) { Text("Check for updates") }
+                }
+            }
+
             item {
                 Text(
                     "Plugins run inside the app with access to your account. Only add plugins you trust.",

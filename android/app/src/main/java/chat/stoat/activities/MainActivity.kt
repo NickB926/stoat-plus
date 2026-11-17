@@ -121,6 +121,7 @@ import chat.stoat.screens.settings.LanguagePickerSettingsScreen
 import chat.stoat.screens.settings.MfaSettingsScreen
 import chat.stoat.screens.settings.NotificationsSettingsScreen
 import chat.stoat.screens.settings.PluginsSettingsScreen
+import chat.stoat.plugins.StoatPlusUpdatePrompt
 import chat.stoat.screens.settings.ProfileSettingsScreen
 import chat.stoat.screens.settings.SessionSettingsScreen
 import chat.stoat.screens.settings.SettingsScreen
@@ -570,6 +571,9 @@ fun AppEntrypoint(
                         }
                     )
                 }
+
+                // Stoat+: update check and dialog
+                StoatPlusUpdatePrompt()
 
                 NavHost(
                     navController = navController,
