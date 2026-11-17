@@ -15,6 +15,7 @@ import {
 import { initDiscordRpc } from "./native/discordRpc";
 import { initPlugins } from "./native/plugins";
 import { initTray } from "./native/tray";
+import { initUpdater } from "./native/updater";
 import { destroyVirtualMic, initVirtualMic } from "./native/virtualMic";
 import { BUILD_URL, createMainWindow, mainWindow } from "./native/window";
 
@@ -49,8 +50,8 @@ if (!config.hardwareAcceleration) {
 const acquiredLock = app.requestSingleInstanceLock();
 
 if (acquiredLock) {
-  // Stoat+: no auto-update. The official updater would replace this fork
-  // with the stock app (and remove plugin support).
+  // Stoat+: the official updater would replace this fork with the stock app,
+  // so Stoat+ checks its own GitHub releases instead (native/updater.ts).
 
   // facilitate stoat:// links
   registerProtocol();
@@ -85,6 +86,7 @@ if (acquiredLock) {
     initDiscordRpc();
     initVirtualMic();
     initAutoLaunch();
+    initUpdater();
 
     // follow the link the app was started with; after the tray exists, as
     // showing the window updates the tray menu

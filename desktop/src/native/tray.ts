@@ -2,9 +2,9 @@ import { Menu, Tray, nativeImage } from "electron";
 
 import trayIconAsset from "../../assets/desktop/icon.png?asset";
 import macOsTrayIconAsset from "../../assets/desktop/iconTemplate.png?asset";
-import { version } from "../../package.json";
 
 import { openPluginManager } from "./plugins";
+import { STOATPLUS_VERSION, checkForUpdates } from "./updater";
 import { mainWindow, quitApp } from "./window";
 
 // internal tray state
@@ -47,11 +47,16 @@ export function updateTrayMenu() {
         type: "submenu",
         submenu: Menu.buildFromTemplate([
           {
-            label: version,
+            label: `Stoat+ ${STOATPLUS_VERSION}`,
             type: "normal",
             enabled: false,
           },
         ]),
+      },
+      {
+        label: "Check for updates…",
+        type: "normal",
+        click: () => checkForUpdates(true),
       },
       { type: "separator" },
       {
