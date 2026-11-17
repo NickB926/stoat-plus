@@ -1,0 +1,105 @@
+package chat.stoat.composables.screens.chat
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import chat.stoat.api.internals.ChannelUtils
+import chat.stoat.core.designsystem.icons.StoatIcons
+import chat.stoat.core.designsystem.icons.painter
+import chat.stoat.core.model.schemas.Channel
+import chat.stoat.core.model.schemas.ChannelType
+import chat.stoat.shared.resources.Res
+import chat.stoat.shared.resources.channel_notes
+import chat.stoat.shared.resources.menu
+import chat.stoat.shared.resources.unknown
+import org.jetbrains.compose.resources.stringResource
+
+@Composable
+fun ChannelHeader(
+    channel: Channel,
+    onChannelClick: (String) -> Unit,
+    onToggleDrawer: () -> Unit,
+    useDrawer: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                channel.id?.let { onChannelClick(it) }
+            }
+            .padding(vertical = 4.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (useDrawer) {
+            IconButton(onClick = {
+                onToggleDrawer()
+            }) {
+                Icon(
+                    painter = StoatIcons.OpenDrawer.painter(),
+                    contentDescription = stringResource(Res.string.menu)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+        } else {
+            // Compensate for the IconButton not increasing our height
+            Spacer(
+                modifier = Modifier
+                    .height(48.dp)
+                    .width(12.dp)
+            )
+        }
+
+        if (channel.channelType != null) {
+            ChannelIcon(
+                channel = channel,
+                modifier = Modifier.alpha(0.6f)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = channel.name
+                    ?: ChannelUtils.resolveName(channel)
+                    ?: if (channel.channelType == ChannelType.SavedMessages) {
+                        stringResource(Res.string.channel_notes)
+                    } else {
+                        stringResource(Res.string.unknown)
+                    },
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            Icon(
+                painter = StoatIcons.Disclosure.painter(),
+                contentDescription = stringResource(Res.string.menu),
+                modifier = Modifier
+                    .size(18.dp)
+                    .alpha(0.4f)
+            )
+        }
+    }
+}

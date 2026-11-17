@@ -1,0 +1,107 @@
+package chat.stoat.composables.screens.chat
+
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
+import androidx.compose.ui.tooling.preview.PreviewParameterProvider
+import chat.stoat.core.designsystem.icons.StoatIcons
+import chat.stoat.core.designsystem.icons.painter
+import chat.stoat.core.model.schemas.Channel
+import chat.stoat.core.model.schemas.ChannelType
+import chat.stoat.shared.resources.Res
+import chat.stoat.shared.resources.channel_dm
+import chat.stoat.shared.resources.channel_group
+import chat.stoat.shared.resources.channel_notes
+import chat.stoat.shared.resources.channel_text
+import chat.stoat.shared.resources.channel_voice
+import org.jetbrains.compose.resources.stringResource
+
+@Composable
+fun ChannelIcon(channel: Channel, modifier: Modifier = Modifier) {
+    ChannelIcon(
+        channelType = channel.channelType ?: ChannelType.TextChannel,
+        hasVoice = channel.channelType == ChannelType.TextChannel && channel.voice != null,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun ChannelIcon(channelType: ChannelType, modifier: Modifier = Modifier) {
+    ChannelIcon(
+        channelType = channelType,
+        hasVoice = channelType == ChannelType.VoiceChannel,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun ChannelIcon(
+    channelType: ChannelType,
+    hasVoice: Boolean,
+    modifier: Modifier,
+) {
+    if (hasVoice || channelType == ChannelType.VoiceChannel) {
+        Icon(
+            painter = StoatIcons.VoiceChannel.painter(),
+            contentDescription = stringResource(Res.string.channel_voice),
+            modifier = modifier
+        )
+        return
+    }
+
+    when (channelType) {
+        ChannelType.TextChannel -> {
+            Icon(
+                painter = StoatIcons.TextChannel.painter(),
+                contentDescription = stringResource(Res.string.channel_text),
+                modifier = modifier
+            )
+        }
+
+        ChannelType.SavedMessages -> {
+            Icon(
+                painter = StoatIcons.NotesChannel.painter(),
+                contentDescription = stringResource(Res.string.channel_notes),
+                modifier = modifier
+            )
+        }
+
+        ChannelType.DirectMessage -> {
+            Icon(
+                painter = StoatIcons.DirectMessage.painter(),
+                contentDescription = stringResource(Res.string.channel_dm),
+                modifier = modifier
+            )
+        }
+
+        ChannelType.Group -> {
+            Icon(
+                painter = StoatIcons.GroupChannel.painter(),
+                contentDescription = stringResource(Res.string.channel_group),
+                modifier = modifier
+            )
+        }
+    }
+}
+
+class ChannelTypeProvider : PreviewParameterProvider<ChannelType> {
+    override val values: Sequence<ChannelType>
+        get() = sequenceOf(
+            ChannelType.TextChannel,
+            ChannelType.VoiceChannel,
+            ChannelType.SavedMessages,
+            ChannelType.DirectMessage,
+            ChannelType.Group
+        )
+
+    override val count: Int
+        get() = values.count()
+}
+
+@Preview
+@Composable
+fun ChannelIconPreview(@PreviewParameter(ChannelTypeProvider::class) channelType: ChannelType) {
+    ChannelIcon(channelType = channelType)
+}

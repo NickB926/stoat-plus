@@ -1,0 +1,152 @@
+package chat.stoat.sheets
+
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
+import chat.stoat.api.StoatAPI
+import chat.stoat.api.routes.channel.removeMember
+import chat.stoat.core.designsystem.components.SheetButton
+import chat.stoat.core.designsystem.icons.StoatIcons
+import chat.stoat.core.designsystem.icons.painter
+import chat.stoat.internals.Platform
+import chat.stoat.platform.LocalToaster
+import chat.stoat.platform.show
+import chat.stoat.shared.resources.Res
+import chat.stoat.shared.resources.copied
+import chat.stoat.shared.resources.member_context_sheet_remove_from_channel
+import chat.stoat.shared.resources.unknown
+import chat.stoat.shared.resources.user_info_sheet_copy_id
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
+
+@Composable
+fun ColumnScope.GroupDMMemberContextSheet(
+    userId: String,
+    channelId: String,
+    dismissSheet: suspend () -> Unit,
+    onRequestUpdateMembers: suspend () -> Unit
+) {
+    val copiedText = stringResource(Res.string.copied)
+    val scope = rememberCoroutineScope()
+    val channel = StoatAPI.channelCache[channelId]
+    val clipboardManager = LocalClipboardManager.current
+    val toaster = LocalToaster.current
+
+    LaunchedEffect(channel) {
+        if (channel == null) {
+            dismissSheet()
+        }
+    }
+
+    if (channel == null) return
+
+    if (channel.owner == StoatAPI.selfId && userId != StoatAPI.selfId) {
+        SheetButton(
+            headlineContent = {
+                CompositionLocalProvider(value = LocalContentColor provides MaterialTheme.colorScheme.error) {
+                    Text(
+                        stringResource(
+                            Res.string.member_context_sheet_remove_from_channel,
+                            channel.name ?: stringResource(Res.string.unknown)
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            },
+            leadingContent = {
+                CompositionLocalProvider(value = LocalContentColor provides MaterialTheme.colorScheme.error) {
+                    Icon(
+                        painter = StoatIcons.RemoveFriend.painter(),
+                        contentDescription = null
+                    )
+                }
+            },
+            onClick = {
+                scope.launch {
+                    removeMember(channelId, userId)
+                    onRequestUpdateMembers()
+                    dismissSheet()
+                }
+            }
+        )
+    }
+
+    // TODO replace with something useful (currently so that your sheet is not empty if you don't have permissions)
+    SheetButton(
+        headlineContent = {
+            Text(stringResource(Res.string.user_info_sheet_copy_id))
+        },
+        leadingContent = {
+            Icon(
+                painter = StoatIcons.CopyId.painter(),
+                contentDescription = null
+            )
+        },
+        onClick = {
+            clipboardManager.setText(AnnotatedString(userId))
+
+            if (Platform.needsShowClipboardNotification()) {
+                toaster.show(copiedText)
+            }
+        }
+    )
+
+
+}
+
+@Composable
+fun ColumnScope.ServerMemberContextSheet(
+    userId: String,
+    serverId: String,
+    channelId: String,
+    dismissSheet: suspend () -> Unit,
+    onRequestUpdateMembers: suspend () -> Unit
+) {
+    val copiedText = stringResource(Res.string.copied)
+    val server = StoatAPI.serverCache[serverId]
+    val channel = StoatAPI.channelCache[channelId]
+    val clipboardManager = LocalClipboardManager.current
+    val toaster = LocalToaster.current
+
+    LaunchedEffect(server) {
+        if (server == null || channel == null) {
+            dismissSheet()
+        }
+    }
+
+    if (server == null || channel == null) return
+
+    // TODO add something useful (moderation actions)
+
+    // TODO replace with something useful (currently so that your sheet is not empty if you don't have permissions)
+    SheetButton(
+        headlineContent = {
+            Text(stringResource(Res.string.user_info_sheet_copy_id))
+        },
+        leadingContent = {
+            Icon(
+                painter = StoatIcons.CopyId.painter(),
+                contentDescription = null
+            )
+        },
+        onClick = {
+            clipboardManager.setText(AnnotatedString(userId))
+
+            if (Platform.needsShowClipboardNotification()) {
+                toaster.show(copiedText)
+            }
+        }
+    )
+
+
+}
