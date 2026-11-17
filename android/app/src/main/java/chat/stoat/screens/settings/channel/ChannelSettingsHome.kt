@@ -1,0 +1,234 @@
+package chat.stoat.screens.settings.channel
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import chat.stoat.api.StoatAPI
+import chat.stoat.api.internals.PermissionBit
+import chat.stoat.api.internals.hasPermission
+import chat.stoat.api.routes.channel.leaveDeleteOrCloseChannel
+import chat.stoat.core.designsystem.icons.StoatIcons
+import chat.stoat.core.designsystem.icons.painter
+import chat.stoat.core.model.schemas.ChannelType
+import chat.stoat.internals.extensions.rememberChannelPermissions
+import chat.stoat.screens.settings.SettingsIcon
+import chat.stoat.screens.settings.SettingsListItem
+import chat.stoat.shared.resources.Res
+import chat.stoat.shared.resources.back
+import chat.stoat.shared.resources.channel_settings
+import chat.stoat.shared.resources.channel_settings_delete
+import chat.stoat.shared.resources.channel_settings_delete_confirm
+import chat.stoat.shared.resources.channel_settings_delete_confirm_description
+import chat.stoat.shared.resources.channel_settings_delete_confirm_no
+import chat.stoat.shared.resources.channel_settings_delete_confirm_yes
+import chat.stoat.shared.resources.channel_settings_header
+import chat.stoat.shared.resources.channel_settings_overview
+import chat.stoat.shared.resources.channel_settings_permissions
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChannelSettingsHome(navController: NavController, channelId: String) {
+    val channel = StoatAPI.channelCache[channelId]
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val permissions by rememberChannelPermissions(channelId)
+    var showDeletionConfirmation by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    if (showDeletionConfirmation) {
+        AlertDialog(
+            onDismissRequest = {
+                showDeletionConfirmation = false
+            },
+            title = { Text(stringResource(Res.string.channel_settings_delete_confirm)) },
+            text = { Text(stringResource(Res.string.channel_settings_delete_confirm_description)) },
+            dismissButton = {
+                TextButton(onClick = {
+                    showDeletionConfirmation = false
+                }) {
+                    Text(stringResource(Res.string.channel_settings_delete_confirm_no))
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    showDeletionConfirmation = false
+                    scope.launch {
+                        leaveDeleteOrCloseChannel(channelId)
+                        navController.popBackStack()
+                    }
+                }) {
+                    Text(stringResource(Res.string.channel_settings_delete_confirm_yes))
+                }
+            }
+        )
+    }
+
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            LargeTopAppBar(
+                scrollBehavior = scrollBehavior,
+                title = {
+                    Text(
+                        text = channel?.let {
+                            when (it.channelType) {
+                                ChannelType.TextChannel, ChannelType.VoiceChannel -> stringResource(
+                                    Res.string.channel_settings_header,
+                                    channel.name ?: channelId
+                                )
+
+                                else -> channel.name ?: stringResource(Res.string.channel_settings)
+                            }
+                        } ?: stringResource(Res.string.channel_settings),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = {
+                        navController.popBackStack()
+                    }) {
+                        Icon(
+                            painter = StoatIcons.Back.painter(),
+                            contentDescription = stringResource(Res.string.back)
+                        )
+                    }
+                },
+            )
+        },
+    ) { pv ->
+        Box(Modifier.padding(pv)) {
+            channel?.let {
+                val canManageChannel = permissions.hasPermission(PermissionBit.ManageChannel)
+                val showPermissions = permissions.hasPermission(PermissionBit.ManageRole)
+                val showDelete = canManageChannel &&
+                        channel.channelType != ChannelType.DirectMessage &&
+                        channel.channelType != ChannelType.Group
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (canManageChannel) {
+                        SettingsListItem(
+                            first = true,
+                            last = !showPermissions && !showDelete,
+                            headlineContent = {
+                                Text(
+                                    text = stringResource(Res.string.channel_settings_overview)
+                                )
+                            },
+                            leadingContent = {
+                                SettingsIcon {
+                                    Icon(
+                                        painter = StoatIcons.Overview.painter(),
+                                        contentDescription = null,
+                                    )
+                                }
+                            },
+                            modifier = Modifier
+                                .testTag("channel_settings_view_overview")
+                                .clickable {
+                                    navController.navigate("settings/channel/${channel.id}/overview")
+                                }
+                        )
+                    }
+
+                    if (showPermissions) {
+                        if (canManageChannel) Spacer(Modifier.height(2.dp))
+                        SettingsListItem(
+                            first = !canManageChannel,
+                            last = !showDelete,
+                            headlineContent = {
+                                Text(
+                                    text = stringResource(Res.string.channel_settings_permissions)
+                                )
+                            },
+                            leadingContent = {
+                                SettingsIcon {
+                                    Icon(
+                                        painter = StoatIcons.Permissions.painter(),
+                                        contentDescription = null,
+                                    )
+                                }
+                            },
+                            modifier = Modifier
+                                .testTag("channel_settings_view_permissions")
+                                .clickable {
+                                    navController.navigate("settings/channel/${channel.id}/permissions")
+                                }
+                        )
+                    }
+
+                    if (showDelete) {
+                        Spacer(Modifier.height(2.dp))
+                        SettingsListItem(
+                            last = true,
+                            headlineContent = {
+                                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.error) {
+                                    Text(
+                                        text = stringResource(Res.string.channel_settings_delete)
+                                    )
+                                }
+                            },
+                            leadingContent = {
+                                SettingsIcon(danger = true) {
+                                    Icon(
+                                        painter = StoatIcons.Delete.painter(),
+                                        contentDescription = null,
+                                    )
+                                }
+                            },
+                            modifier = Modifier
+                                .testTag("channel_settings_click_delete")
+                                .clickable {
+                                    showDeletionConfirmation = true
+                                }
+                        )
+                    }
+                }
+            } ?: run {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                }
+            }
+        }
+    }
+}

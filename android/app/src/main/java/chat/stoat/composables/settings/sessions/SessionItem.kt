@@ -1,0 +1,67 @@
+package chat.stoat.composables.settings.sessions
+
+import android.text.format.DateUtils
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import chat.stoat.api.internals.ULID
+import chat.stoat.core.designsystem.icons.StoatIcons
+import chat.stoat.core.designsystem.icons.painter
+import chat.stoat.core.model.schemas.Session
+import chat.stoat.shared.resources.Res
+import chat.stoat.shared.resources.logout
+import chat.stoat.shared.resources.settings_sessions_first_seen
+import org.jetbrains.compose.resources.stringResource
+
+@Composable
+fun SessionItem(
+    session: Session,
+    modifier: Modifier = Modifier,
+    currentSession: Boolean = false,
+    onLogout: (Session) -> Unit
+) {
+    val decodedUlid by remember(session) { mutableLongStateOf(ULID.asTimestamp(session.id)) }
+    val formattedTimestamp = remember(decodedUlid) {
+        DateUtils.getRelativeTimeSpanString(
+            decodedUlid,
+            System.currentTimeMillis(),
+            DateUtils.MINUTE_IN_MILLIS
+        )
+    }
+
+    ListItem(
+        supportingContent = {
+            Text(
+                text = stringResource(Res.string.settings_sessions_first_seen, formattedTimestamp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        trailingContent = {
+            if (!currentSession) {
+                IconButton(onClick = {
+                    onLogout(session)
+                }) {
+                    Icon(
+                        painter = StoatIcons.LogOut.painter(),
+                        contentDescription = stringResource(Res.string.logout)
+                    )
+                }
+            }
+        },
+        modifier = modifier
+    ) {
+        Text(
+            text = session.name,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}

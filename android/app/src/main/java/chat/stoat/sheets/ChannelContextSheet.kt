@@ -1,0 +1,101 @@
+package chat.stoat.sheets
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.dp
+import chat.stoat.api.StoatAPI
+
+import chat.stoat.core.designsystem.components.SheetButton
+import chat.stoat.core.designsystem.icons.StoatIcons
+import chat.stoat.core.designsystem.icons.painter
+import chat.stoat.internals.Platform
+import chat.stoat.platform.LocalToaster
+import chat.stoat.platform.show
+import chat.stoat.shared.resources.Res
+import chat.stoat.shared.resources.channel_context_sheet_actions_copy_id
+import chat.stoat.shared.resources.channel_context_sheet_actions_copy_id_copied
+import chat.stoat.shared.resources.channel_context_sheet_actions_mark_read
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
+
+@Composable
+fun ChannelContextSheet(channelId: String, onHideSheet: suspend () -> Unit) {
+    val channelContextSheetActionsCopyIdCopiedText = stringResource(Res.string.channel_context_sheet_actions_copy_id_copied)
+    val channel = StoatAPI.channelCache[channelId]
+    if (channel == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+        ) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+        }
+        return
+    }
+
+    val clipboardManager = LocalClipboardManager.current
+    val toaster = LocalToaster.current
+
+    val coroutineScope = rememberCoroutineScope()
+
+    SheetButton(
+        headlineContent = {
+            Text(
+                text = stringResource(Res.string.channel_context_sheet_actions_copy_id),
+            )
+        },
+        leadingContent = {
+            Icon(
+                painter = StoatIcons.CopyId.painter(),
+                contentDescription = null
+            )
+        },
+        onClick = {
+            if (channel.id == null) return@SheetButton
+
+            clipboardManager.setText(AnnotatedString(channel.id!!))
+
+            if (Platform.needsShowClipboardNotification()) {
+                toaster.show(channelContextSheetActionsCopyIdCopiedText)
+            }
+
+            coroutineScope.launch {
+                onHideSheet()
+            }
+        }
+    )
+
+    SheetButton(
+        headlineContent = {
+            Text(
+                text = stringResource(Res.string.channel_context_sheet_actions_mark_read),
+            )
+        },
+        leadingContent = {
+            Icon(
+                painter = StoatIcons.MarkRead.painter(),
+                contentDescription = null
+            )
+        },
+        onClick = {
+            coroutineScope.launch {
+                channel.lastMessageID?.let {
+                    StoatAPI.unreads.markAsRead(channelId, it, sync = true)
+                }
+                onHideSheet()
+            }
+        }
+    )
+
+
+}

@@ -1,0 +1,293 @@
+package chat.stoat.activities.media
+
+import android.content.ContentValues
+import android.content.Intent
+import android.os.Bundle
+import android.provider.MediaStore
+import android.util.Log
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.core.view.WindowCompat
+import chat.stoat.api.StoatHttp
+import chat.stoat.api.StoatJson
+import chat.stoat.core.designsystem.icons.StoatIcons
+import chat.stoat.core.designsystem.icons.painter
+import chat.stoat.core.model.schemas.AutumnResource
+import chat.stoat.core.model.data.STOAT_FILES
+import chat.stoat.platform.StoatAppTheme
+import chat.stoat.providers.getAttachmentContentUri
+import chat.stoat.shared.resources.Res
+import chat.stoat.shared.resources.back
+import chat.stoat.shared.resources.media_viewer_open
+import chat.stoat.shared.resources.media_viewer_save
+import chat.stoat.shared.resources.media_viewer_saved
+import chat.stoat.shared.resources.media_viewer_share_image
+import chat.stoat.shared.resources.media_viewer_share_url
+import chat.stoat.shared.resources.media_viewer_title_image
+import chat.stoat.shared.resources.share
+import io.ktor.client.request.get
+import io.ktor.client.statement.readBytes
+import kotlinx.coroutines.launch
+import me.saket.telephoto.zoomable.ZoomSpec
+import me.saket.telephoto.zoomable.glide.ZoomableGlideImage
+import me.saket.telephoto.zoomable.rememberZoomableImageState
+import me.saket.telephoto.zoomable.rememberZoomableState
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
+
+class ImageViewActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        val autumnResource = intent.getStringExtra("autumnResource")
+            ?.let { StoatJson.decodeFromString(AutumnResource.serializer(), it) }
+
+        if (autumnResource?.id == null) {
+            Log.e("ImageViewActivity", "No AutumnResource provided")
+            finish()
+            return
+        }
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        setContent {
+            ImageViewScreen(resource = autumnResource, onClose = { finish() })
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ImageViewScreen(resource: AutumnResource, onClose: () -> Unit = {}) {
+    val resourceUrl = "$STOAT_FILES/attachments/${resource.id}/${resource.filename}"
+
+    val context = LocalContext.current
+
+    val coroutineScope = rememberCoroutineScope()
+
+    val activityLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {}
+
+    val shareSubmenuIsOpen = remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    fun shareUrl() {
+        shareSubmenuIsOpen.value = false
+
+        val intent =
+            Intent(Intent.ACTION_SEND)
+        intent.type = "text/plain"
+        intent.putExtra(
+            Intent.EXTRA_TEXT,
+            resourceUrl
+        )
+
+        val shareIntent = Intent.createChooser(intent, null)
+        activityLauncher.launch(shareIntent)
+    }
+
+    fun shareImage() {
+        shareSubmenuIsOpen.value = false
+
+        coroutineScope.launch {
+            val contentUri = getAttachmentContentUri(
+                context,
+                resourceUrl,
+                resource.id!!,
+                resource.filename ?: "image"
+            )
+
+            val intent =
+                Intent(Intent.ACTION_SEND)
+            intent.type = resource.contentType ?: "image/*"
+            intent.putExtra(
+                Intent.EXTRA_STREAM,
+                contentUri
+            )
+
+            val shareIntent = Intent.createChooser(intent, null)
+            activityLauncher.launch(shareIntent)
+        }
+    }
+
+    fun saveToGallery() {
+        coroutineScope.launch {
+            context.applicationContext.let {
+                it.contentResolver.insert(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    ContentValues().apply {
+                        put(MediaStore.Images.Media.DISPLAY_NAME, resource.filename)
+                        put(MediaStore.Images.Media.MIME_TYPE, resource.contentType)
+                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Revolt")
+                        put(MediaStore.Images.Media.IS_PENDING, 1)
+                    }
+                )
+            }?.let { uri ->
+                context.contentResolver.openOutputStream(uri).use { stream ->
+                    val image = StoatHttp.get(resourceUrl).readBytes()
+                    stream?.write(image)
+
+                    context.applicationContext.let {
+                        it.contentResolver.update(
+                            uri,
+                            ContentValues().apply {
+                                put(MediaStore.Images.Media.IS_PENDING, 0)
+                            },
+                            null,
+                            null
+                        )
+                    }
+
+                    val snackbar = snackbarHostState.showSnackbar(
+                        message = getString(Res.string.media_viewer_saved),
+                        actionLabel = getString(Res.string.media_viewer_open),
+                        duration = SnackbarDuration.Short
+                    )
+
+                    if (snackbar == SnackbarResult.ActionPerformed) {
+                        val intent = Intent(Intent.ACTION_VIEW)
+                        intent.setDataAndType(uri, resource.contentType)
+                        intent.flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        activityLauncher.launch(intent)
+                    }
+                }
+            }
+        }
+    }
+
+    StoatAppTheme {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = stringResource(
+                                Res.string.media_viewer_title_image,
+                                resource.filename ?: resource.id!!
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            onClose()
+                        }) {
+                            Icon(
+                                painter = StoatIcons.Back.painter(),
+                                contentDescription = stringResource(Res.string.back)
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            shareSubmenuIsOpen.value = true
+                        }) {
+                            Icon(
+                                painter = StoatIcons.Share.painter(),
+                                contentDescription = stringResource(Res.string.share)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = shareSubmenuIsOpen.value,
+                            onDismissRequest = {
+                                shareSubmenuIsOpen.value = false
+                            }
+                        ) {
+                            DropdownMenuItem(
+                                onClick = {
+                                    shareUrl()
+                                },
+                                text = {
+                                    Text(
+                                        stringResource(Res.string.media_viewer_share_url)
+                                    )
+                                }
+                            )
+                            DropdownMenuItem(
+                                onClick = {
+                                    shareImage()
+                                },
+                                text = {
+                                    Text(
+                                        stringResource(
+                                            Res.string.media_viewer_share_image
+                                        )
+                                    )
+                                }
+                            )
+                        }
+
+                        IconButton(onClick = {
+                            saveToGallery()
+                        }) {
+                            Icon(
+                                painter = StoatIcons.SaveToDevice.painter(),
+                                contentDescription = stringResource(
+                                    Res.string.media_viewer_save
+                                )
+                            )
+                        }
+                    }
+                )
+            },
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+        ) { pv ->
+            Surface(
+                modifier = Modifier
+                    .padding(pv)
+                    .background(MaterialTheme.colorScheme.background)
+                    .fillMaxSize()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RectangleShape)
+                        .fillMaxSize()
+                ) {
+                    ZoomableGlideImage(
+                        model = resourceUrl,
+                        contentDescription = null,
+                        state = rememberZoomableImageState(
+                            rememberZoomableState(
+                                zoomSpec = ZoomSpec(maxZoomFactor = 10f)
+                            )
+                        ),
+                        modifier = Modifier
+                            .fillMaxSize()
+                    )
+                }
+            }
+        }
+    }
+}
