@@ -363,7 +363,123 @@
       svg.after(plus);
     }
   }
-  new MutationObserver(brandTitlebar).observe(document, { childList: true, subtree: true });
+  // ---------- "Plugins" entry in the Settings sidebar ----------
+  // The sidebar is drawn by the remote web app, so we find it by its labels
+  // and copy an existing entry to match its look.
+
+  const PUZZLE_SVG =
+    '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 11H19V7a2 2 0 0 0-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4a2 2 0 0 0-2 2v3.8h1.5a2.7 2.7 0 0 1 0 5.4H2V20a2 2 0 0 0 2 2h3.8v-1.5a2.7 2.7 0 0 1 5.4 0V22H17a2 2 0 0 0 2-2v-4h1.5a2.5 2.5 0 0 0 0-5z"/></svg>';
+
+  function findLabel(label) {
+    return document.evaluate(
+      `//*[not(self::script) and not(self::style)][normalize-space(text())="${label}"]`,
+      document.body, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null,
+    ).singleNodeValue;
+  }
+
+  function commonAncestor(a, b) {
+    const seen = new Set();
+    for (let x = a; x; x = x.parentElement) seen.add(x);
+    for (let y = b; y; y = y.parentElement) if (seen.has(y)) return y;
+    return null;
+  }
+
+  function addSettingsEntry() {
+    if (!document.body || document.querySelector("[data-stoat-plus-settings]")) return;
+    const appearance = findLabel("Appearance");
+    const notifications = findLabel("Notifications");
+    if (!appearance || !notifications) return;
+    const list = commonAncestor(appearance, notifications);
+    if (!list) return;
+
+    // The entry to insert after: "Desktop" if it's in this list, else "Notifications".
+    const desktop = findLabel("Desktop");
+    const anchorLabel = desktop && list.contains(desktop) ? desktop : notifications;
+    let anchor = anchorLabel;
+    let depth = 0;
+    while (anchor.parentElement !== list) { anchor = anchor.parentElement; depth++; }
+
+    // Copy an entry that's never highlighted as the open page, so the copy isn't either.
+    let source = anchor;
+    let sourceLabel = anchorLabel;
+    for (const name of ["Source Code", "What's New", "Feedback"]) {
+      const el = findLabel(name);
+      if (!el) continue;
+      let item = el;
+      for (let i = 0; i < depth && item.parentElement; i++) item = item.parentElement;
+      if (item.tagName === anchor.tagName) { source = item; sourceLabel = el; break; }
+    }
+
+    const path = [];
+    for (let x = sourceLabel; x !== source; x = x.parentElement) {
+      path.unshift([...x.parentElement.children].indexOf(x));
+    }
+    const entry = source.cloneNode(true);
+    let label = entry;
+    for (const i of path) label = label.children[i];
+    label.textContent = "Plugins";
+
+    // Prefer the anchor's icon style (an icon-font glyph), set to "extension" (a puzzle piece).
+    const isGlyph = (el, not) =>
+      el !== not && el.children.length === 0 && /^[a-z_]+$/.test(el.textContent.trim());
+    const anchorGlyph = [...anchor.querySelectorAll("*")].find((el) => isGlyph(el, anchorLabel));
+    const oldIcon = entry.querySelector("svg") ||
+      [...entry.querySelectorAll("*")].find((el) => isGlyph(el, label));
+    const svg = entry.querySelector("svg");
+    if (anchorGlyph && oldIcon) {
+      const glyph = anchorGlyph.cloneNode(true);
+      glyph.textContent = "extension";
+      oldIcon.replaceWith(glyph);
+    } else if (svg) {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = PUZZLE_SVG;
+      const icon = tmp.firstChild;
+      for (const attr of ["class", "style", "width", "height"]) {
+        if (svg.hasAttribute(attr)) icon.setAttribute(attr, svg.getAttribute(attr));
+      }
+      if (!svg.hasAttribute("width") && !svg.hasAttribute("class")) {
+        icon.setAttribute("width", "20");
+        icon.setAttribute("height", "20");
+      }
+      svg.replaceWith(icon);
+    } else {
+      // Icon font (Material Symbols): the icon is a short lowercase word.
+      for (const el of entry.querySelectorAll("*")) {
+        if (el !== label && el.children.length === 0 && /^[a-z_]+$/.test(el.textContent.trim())) {
+          el.textContent = "extension";
+          break;
+        }
+      }
+    }
+
+    for (const el of [entry, ...entry.querySelectorAll("*")]) {
+      el.removeAttribute("href");
+      el.removeAttribute("target");
+      el.removeAttribute("aria-current");
+      el.removeAttribute("aria-selected");
+      el.removeAttribute("id");
+    }
+    entry.setAttribute("data-stoat-plus-settings", "");
+    entry.setAttribute("role", "button");
+    entry.style.cursor = "pointer";
+    entry.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openManager();
+    }, true);
+    anchor.after(entry);
+  }
+
+  let domTimer = null;
+  function onDomChange() {
+    brandTitlebar();
+    if (domTimer) return;
+    domTimer = setTimeout(() => {
+      domTimer = null;
+      try { addSettingsEntry(); } catch (e) { console.warn("[Stoat+] settings entry", e); }
+    }, 150);
+  }
+  new MutationObserver(onDomChange).observe(document, { childList: true, subtree: true });
 
   // ---------- loading ----------
 
