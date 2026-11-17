@@ -110,3 +110,7 @@
 }
 
 -keep class chat.stoat.ndk.AstNode { *; }
+# Stoat+: the plugin engine's WebView bridge is called by name from JS.
+-keepclassmembers class chat.stoat.plugins.PluginEngine$Bridge {
+    @android.webkit.JavascriptInterface <methods>;
+}

@@ -7,6 +7,7 @@ import android.os.StrictMode
 import chat.stoat.api.realtime.RealtimeConnectionMonitor
 import chat.stoat.di.appModule
 import chat.stoat.di.viewModelModule
+import chat.stoat.plugins.PluginEngine
 import co.touchlab.kermit.Logger
 import co.touchlab.kermit.Severity
 import coil3.ImageLoader
@@ -47,6 +48,9 @@ class StoatApplication : Application(), SingletonImageLoader.Factory {
         }
 
         RealtimeConnectionMonitor(this).start()
+
+        // Stoat+: start the plugin engine
+        PluginEngine.init(this)
 
         if (BuildConfig.DEBUG) {
             // Enable strict mode primarily to catch non-API usage, although we detect all

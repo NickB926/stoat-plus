@@ -1,6 +1,8 @@
 package chat.stoat.screens.chat.views.channel
 
 import android.util.Log
+import chat.stoat.plugins.PluginEngine
+import chat.stoat.plugins.SendDecision
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -510,7 +512,7 @@ class ChannelScreenViewModel(
         // 1. they will be cleared
         // 2. if the user changes the content while the message is being sent we want to persist
         //    the original content
-        val content = contentOverride
+        val typedContent = contentOverride
             ?: MessageProcessor.processOutgoing(draftContent, channel?.server)
         val replyTo = draftReplyTo.toList()
         val returnToLatestBeforeRenderingSend = canLoadNewer
@@ -518,6 +520,26 @@ class ChannelScreenViewModel(
         // First we upload (the next 5) attachments...
         viewModelScope.launch {
             isSending = true
+
+            // Stoat+: let plugins run commands and change (or stop) the message.
+            val decision = PluginEngine.beforeSend(
+                channelId = channel?.id ?: "",
+                content = typedContent,
+                replyIds = replyTo.map { it.id },
+                hasAttachments = (attachmentsOverride ?: draftAttachments).isNotEmpty(),
+            )
+            val content = when (decision) {
+                is SendDecision.Send -> decision.content
+                SendDecision.Cancel -> {
+                    if (contentOverride == null) {
+                        kvStorage.remove("draftContent/${channel?.id}")
+                        putDraftContent("", true)
+                        draftReplyTo.clear()
+                    }
+                    isSending = false
+                    return@launch
+                }
+            }
             if (returnToLatestBeforeRenderingSend) {
                 loadMessagesJob?.cancel()
                 requestSequence++

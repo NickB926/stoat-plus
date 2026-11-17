@@ -120,6 +120,7 @@ import chat.stoat.screens.settings.ExperimentsSettingsScreen
 import chat.stoat.screens.settings.LanguagePickerSettingsScreen
 import chat.stoat.screens.settings.MfaSettingsScreen
 import chat.stoat.screens.settings.NotificationsSettingsScreen
+import chat.stoat.screens.settings.PluginsSettingsScreen
 import chat.stoat.screens.settings.ProfileSettingsScreen
 import chat.stoat.screens.settings.SessionSettingsScreen
 import chat.stoat.screens.settings.SettingsScreen
@@ -768,6 +769,7 @@ fun AppEntrypoint(
                     composable("settings/appearance") { AppearanceSettingsScreen(navController) }
                     composable("settings/chat") { ChatSettingsScreen(navController) }
                     composable("settings/notifications") { NotificationsSettingsScreen(navController) }
+                    composable("settings/plugins") { PluginsSettingsScreen(navController) }
                     composable("settings/debug") { DebugSettingsScreen(navController) }
                     composable("settings/experiments") { ExperimentsSettingsScreen(navController) }
                     composable("settings/language") { LanguagePickerSettingsScreen(navController) }

@@ -3,6 +3,7 @@ import io.sentry.android.gradle.instrumentation.logcat.LogcatLevel
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.io.FileInputStream
 import java.util.Properties
+import javax.inject.Inject
 
 plugins {
     alias(libs.plugins.android.application)
@@ -63,7 +64,7 @@ android {
     namespace = "chat.stoat"
 
     defaultConfig {
-        applicationId = "chat.revolt"
+        applicationId = "chat.stoat.plus"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = Integer.parseInt("001_008_001".replace("_", ""), 10)
@@ -77,6 +78,8 @@ android {
 
     buildTypes {
         release {
+            // Stoat+: sideloaded builds are signed with this machine's debug key.
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -379,6 +382,42 @@ androidComponents {
         variant.sources.res?.addGeneratedSourceDirectory(
             task,
             GenerateLocaleConfig::outputDirectory
+        )
+    }
+}
+
+// Stoat+: bundle the shared plugin runtime and example plugins (../shared)
+// into assets/stoatplus/, next to host-android.js.
+abstract class SyncStoatPlusAssets : DefaultTask() {
+    @get:InputDirectory
+    abstract val sharedDir: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @get:Inject
+    abstract val fileOps: FileSystemOperations
+
+    @TaskAction
+    fun sync() {
+        fileOps.sync {
+            from(sharedDir) {
+                include("runtime.js", "plugins/*.js")
+            }
+            into(outputDir.dir("stoatplus"))
+        }
+    }
+}
+
+val syncStoatPlusAssets = tasks.register<SyncStoatPlusAssets>("syncStoatPlusAssets") {
+    sharedDir.set(rootProject.layout.projectDirectory.dir("../shared"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(
+            syncStoatPlusAssets,
+            SyncStoatPlusAssets::outputDir,
         )
     }
 }

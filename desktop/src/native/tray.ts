@@ -4,6 +4,7 @@ import trayIconAsset from "../../assets/desktop/icon.png?asset";
 import macOsTrayIconAsset from "../../assets/desktop/iconTemplate.png?asset";
 import { version } from "../../package.json";
 
+import { openPluginManager } from "./plugins";
 import { mainWindow, quitApp } from "./window";
 
 // internal tray state
@@ -25,7 +26,7 @@ export function initTray() {
   const trayIcon = createTrayIcon();
   tray = new Tray(trayIcon);
   updateTrayMenu();
-  tray.setToolTip("Stoat for Desktop");
+  tray.setToolTip("Stoat+");
   tray.setImage(trayIcon);
   tray.on("click", () => {
     if (mainWindow.isVisible()) {
@@ -40,7 +41,7 @@ export function initTray() {
 export function updateTrayMenu() {
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: "Stoat for Desktop", type: "normal", enabled: false },
+      { label: "Stoat+", type: "normal", enabled: false },
       {
         label: "Version",
         type: "submenu",
@@ -53,6 +54,11 @@ export function updateTrayMenu() {
         ]),
       },
       { type: "separator" },
+      {
+        label: "Plugins…",
+        type: "normal",
+        click: openPluginManager,
+      },
       {
         label: mainWindow.isVisible() ? "Hide App" : "Show App",
         type: "normal",

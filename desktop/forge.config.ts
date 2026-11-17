@@ -14,8 +14,8 @@ import path from "node:path";
 
 const STRINGS = {
   author: "Revolt Platforms LTD",
-  name: "Stoat",
-  execName: "stoat-desktop",
+  name: "Stoat Plus",
+  execName: "stoat-plus",
   description: "Open source user-first chat platform.",
 };
 

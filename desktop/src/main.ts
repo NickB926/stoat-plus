@@ -1,8 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { IUpdateInfo, updateElectronApp } from "update-electron-app";
 
-import { BrowserWindow, Notification, app, shell } from "electron";
+import { BrowserWindow, app, shell } from "electron";
 import started from "electron-squirrel-startup";
 
 import { initAutoLaunch } from "./native/autoLaunch";
@@ -14,6 +13,7 @@ import {
   registerProtocol,
 } from "./native/deepLink";
 import { initDiscordRpc } from "./native/discordRpc";
+import { initPlugins } from "./native/plugins";
 import { initTray } from "./native/tray";
 import { destroyVirtualMic, initVirtualMic } from "./native/virtualMic";
 import { BUILD_URL, createMainWindow, mainWindow } from "./native/window";
@@ -48,19 +48,9 @@ if (!config.hardwareAcceleration) {
 // ensure only one copy of the application can run
 const acquiredLock = app.requestSingleInstanceLock();
 
-const onNotifyUser = (_info: IUpdateInfo) => {
-  const notification = new Notification({
-    title: "Update Available",
-    body: "Restart the app to install the update.",
-    silent: true,
-  });
-
-  notification.show();
-};
-
 if (acquiredLock) {
-  // start auto update logic
-  updateElectronApp({ onNotifyUser });
+  // Stoat+: no auto-update. The official updater would replace this fork
+  // with the stock app (and remove plugin support).
 
   // facilitate stoat:// links
   registerProtocol();
@@ -81,6 +71,7 @@ if (acquiredLock) {
   app.on("ready", () => {
     // create window and application contexts
     initDeepLinks();
+    initPlugins();
     createMainWindow();
 
     // save first launch state

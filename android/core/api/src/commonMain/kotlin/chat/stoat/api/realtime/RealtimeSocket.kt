@@ -18,6 +18,7 @@ import chat.stoat.api.realtime.frames.receivable.EmojiDeleteFrame
 import chat.stoat.api.realtime.frames.receivable.MessageAppendFrame
 import chat.stoat.api.realtime.frames.receivable.MessageDeleteFrame
 import chat.stoat.api.realtime.frames.receivable.MessageFrame
+import chat.stoat.api.hooks.ClientHooks
 import chat.stoat.api.realtime.frames.receivable.MessageReactFrame
 import chat.stoat.api.realtime.frames.receivable.MessageUpdateFrame
 import chat.stoat.api.realtime.frames.receivable.PongFrame
@@ -317,7 +318,14 @@ object RealtimeSocket {
             }
 
             "Message" -> {
-                val messageFrame = StoatJson.decodeFromString(MessageFrame.serializer(), rawFrame)
+                val decodedFrame = StoatJson.decodeFromString(MessageFrame.serializer(), rawFrame)
+                // Stoat+: plugins may change or hide the message.
+                val messageFrame = ClientHooks.applyIncoming(listOf(decodedFrame), live = true)
+                    .firstOrNull()
+                if (messageFrame == null) {
+                    Logger.d { "Message ${decodedFrame.id} hidden by a plugin." }
+                    return
+                }
                 Logger.d {
                     "Received message frame for ${messageFrame.id} in channel ${messageFrame.channel}."
                 }

@@ -68,6 +68,13 @@ export function createMainWindow() {
   // hide the options
   mainWindow.setMenu(null);
 
+  // Stoat+: show our own name in the window title / taskbar
+  mainWindow.setTitle("Stoat+");
+  mainWindow.on("page-title-updated", (event, title) => {
+    event.preventDefault();
+    mainWindow.setTitle(title.replace(/\bStoat\b(?!\+)/, "Stoat+"));
+  });
+
   // restore last position if it was moved previously
   if (config.windowState.x > 0 || config.windowState.y > 0) {
     mainWindow.setPosition(

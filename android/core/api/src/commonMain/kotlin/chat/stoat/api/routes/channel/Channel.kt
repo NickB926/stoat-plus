@@ -5,6 +5,7 @@ import chat.stoat.api.StoatAPIError
 import chat.stoat.api.StoatHttp
 import chat.stoat.api.StoatJson
 import chat.stoat.api.api
+import chat.stoat.api.hooks.ClientHooks
 import chat.stoat.api.apiError
 import chat.stoat.api.internals.ULID
 import chat.stoat.core.model.schemas.Channel
@@ -52,8 +53,8 @@ suspend fun fetchMessagesFromChannel(
     }
         .bodyAsText()
 
-    if (includeUsers) {
-        return StoatJson.decodeFromString(
+    val page = if (includeUsers) {
+        StoatJson.decodeFromString(
             MessagesInChannel.serializer(),
             response
         )
@@ -63,12 +64,19 @@ suspend fun fetchMessagesFromChannel(
             response
         )
 
-        return MessagesInChannel(
+        MessagesInChannel(
             messages = messages,
             users = emptyList(),
             members = emptyList()
         )
     }
+
+    // Stoat+: plugins may change or hide messages loaded from history.
+    return page.copy(
+        messages = page.messages?.let {
+            ClientHooks.applyIncoming(it, live = false).filterNotNull()
+        }
+    )
 }
 
 @kotlinx.serialization.Serializable

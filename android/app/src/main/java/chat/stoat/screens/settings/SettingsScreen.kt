@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -227,7 +229,6 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(2.dp))
                     SettingsListItem(
-                        last = true,
                         headlineContent = { Text(text = stringResource(Res.string.settings_notifications)) },
                         leadingContent = {
                             SettingsIcon {
@@ -240,6 +241,23 @@ fun SettingsScreen(
                         modifier = Modifier
                             .testTag("settings_view_notifications")
                             .clickable { navController.navigate("settings/notifications") }
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    SettingsListItem(
+                        last = true,
+                        headlineContent = { Text(text = "Plugins") },
+                        supportingContent = { Text(text = "Stoat+") },
+                        leadingContent = {
+                            SettingsIcon {
+                                Icon(
+                                    imageVector = Icons.Default.Build,
+                                    contentDescription = null,
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .testTag("settings_view_plugins")
+                            .clickable { navController.navigate("settings/plugins") }
                     )
 
                     ListHeader {

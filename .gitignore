@@ -1,0 +1,15 @@
+# build logs and outputs
+*.log
+Stoat+.apk
+*.apk
+
+# signing keys never go in the repo
+keys/
+*.jks
+*.keystore
+signing.properties
+
+# Stoat brand assets are pulled from stoatchat/assets at build time
+desktop/assets/
+
+node_modules/
